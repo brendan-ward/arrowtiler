@@ -1063,7 +1063,7 @@ GEOSGeometry **clip_project_to_tile(GEOSGeometry **geometries, size_t count,
       if ((geom_xmax - geom_xmin) < min_width &&
           (geom_ymax - geom_ymin) < min_height) {
         // too small: skip
-        printf("INFO: geometry is too small to represent in tile\n");
+        // printf("INFO: geometry is too small to represent in tile\n");
         continue;
       }
     }
@@ -1165,8 +1165,8 @@ GEOSGeometry **clip_project_to_tile(GEOSGeometry **geometries, size_t count,
          new_geom_type == GEOS_LINESTRING) ||
         (geom_type == GEOS_POLYGON && new_geom_type == GEOS_POLYGON);
     if (GEOSisEmpty_r(ctx, geom) || !is_same_type) {
-      printf("INFO: Geometry was collapsed or converted to a different "
-             "dimensionality; it will not be included in tile\n");
+      // printf("INFO: Geometry was collapsed or converted to a different "
+      //        "dimensionality; it will not be included in tile\n");
       out_geoms[i] = NULL;
       continue;
     }

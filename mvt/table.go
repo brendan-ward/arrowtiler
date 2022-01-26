@@ -101,8 +101,6 @@ func ReadFeather(path string, geomColName string, idColName string) (*FeatureTab
 	col = t.Column(geomColIdx).Data()
 
 	wkbs := make([][]byte, t.NumRows())
-
-	// geometries := make([]*geos.Geometry, t.NumRows())
 	i = 0
 	for _, chunk := range col.Chunks() {
 		c := chunk.(*array.Binary)
@@ -111,6 +109,7 @@ func ReadFeather(path string, geomColName string, idColName string) (*FeatureTab
 			i++
 		}
 	}
+
 	geometries, err := geos.NewGeometryArrayFromWKB(wkbs)
 	if err != nil {
 		return nil, err
@@ -147,7 +146,7 @@ func ReadFeather(path string, geomColName string, idColName string) (*FeatureTab
 			}
 
 			for j := 0; j < chunk.Len(); j++ {
-				encodedValue, err := getEncodedValue(chunk, i)
+				encodedValue, err := getEncodedValue(chunk, j)
 				if err != nil {
 					return nil, err
 				}
