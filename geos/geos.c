@@ -1014,8 +1014,6 @@ GEOSGeometry **clip_project_to_tile(GEOSGeometry **geometries, size_t count,
   int i, j, geom_type, new_geom_type, num_coords, num_sub_geoms;
   char is_same_type;
   GEOSGeometry *geom, *new_geom;
-  // const GEOSGeometry *subgeom;
-  // GEOSGeometry *ring;
   geometry_project_func *proj_func = NULL;
 
   GEOS_INIT;
@@ -1161,12 +1159,18 @@ GEOSGeometry **clip_project_to_tile(GEOSGeometry **geometries, size_t count,
     is_same_type =
         (geom_type == new_geom_type) ||
         (geom_type == GEOS_MULTIPOINT && new_geom_type == GEOS_POINT) ||
+        (geom_type == GEOS_POINT && new_geom_type == GEOS_MULTIPOINT) ||
         (geom_type == GEOS_MULTILINESTRING &&
          new_geom_type == GEOS_LINESTRING) ||
-        (geom_type == GEOS_POLYGON && new_geom_type == GEOS_POLYGON);
+        (geom_type == GEOS_LINESTRING &&
+         new_geom_type == GEOS_MULTILINESTRING) ||
+        (geom_type == GEOS_MULTIPOLYGON && new_geom_type == GEOS_POLYGON) ||
+        (geom_type == GEOS_POLYGON && new_geom_type == GEOS_MULTIPOLYGON);
     if (GEOSisEmpty_r(ctx, geom) || !is_same_type) {
-      // printf("INFO: Geometry was collapsed or converted to a different "
-      //        "dimensionality; it will not be included in tile\n");
+      // printf(
+      //     "INFO: Geometry (type %i) was collapsed or converted to a different
+      //     " "dimensionality (type %i, is empty? %i); it will not be included
+      //     in " "tile\n", geom_type, new_geom_type, GEOSisEmpty_r(ctx, geom));
       out_geoms[i] = NULL;
       continue;
     }

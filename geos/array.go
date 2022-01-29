@@ -44,9 +44,11 @@ func newGeometryArrayFromGEOS(ptr *GEOSGeometry, size int) *GeometryArray {
 	// copy from C array to Go slice (C array must be freed by caller)
 	cArr := unsafe.Slice((**C.GEOSGeometry)(ptr), size)
 	geometries := make([]GEOSGeometry, size)
+	var p unsafe.Pointer
 	for i := 0; i < size; i++ {
-		if cArr[i] != nil {
-			geometries[i] = (GEOSGeometry)(unsafe.Pointer(cArr[i]))
+		p = unsafe.Pointer(cArr[i])
+		if p != nil {
+			geometries[i] = GEOSGeometry(p)
 		}
 	}
 
@@ -128,10 +130,12 @@ func (g *GeometryArray) ToWKT(precision int) ([]string, error) {
 	}
 
 	cArr := unsafe.Slice((**C.char)(ptr), size)
+	var p unsafe.Pointer
 	defer func() {
 		for i := 0; i < size; i++ {
-			if cArr[i] != nil {
-				C.free(unsafe.Pointer(cArr[i]))
+			p = unsafe.Pointer(cArr[i])
+			if p != nil {
+				C.free(p)
 			}
 		}
 	}()
@@ -332,17 +336,24 @@ func (g *GeometryArray) ToTile(t *tiles.TileID) ([]int, []byte, [][]uint32, erro
 
 	// copy from C array to Go slice
 	indexes := make([]int, 0, size+1)
-	geomsToEncode := make([]GEOSGeometry, size)
+	geomsToEncode := make([]GEOSGeometry, 0, size+1)
 
 	cArr := unsafe.Slice((**C.GEOSGeometry)(ptr), size)
+	var p unsafe.Pointer
 	for i := 0; i < size; i++ {
-		if cArr[i] != nil {
+		p = unsafe.Pointer(cArr[i])
+		if p != nil {
 			indexes = append(indexes, hits[i])
-			geomsToEncode[i] = (GEOSGeometry)(unsafe.Pointer(cArr[i]))
+			geomsToEncode = append(geomsToEncode, GEOSGeometry(p))
 		}
 	}
+
 	// make sure that geometries are released
 	defer freeGeometries(geomsToEncode)
+
+	if len(geomsToEncode) == 0 {
+		return nil, nil, nil, nil
+	}
 
 	// TODO: additional simplification steps would occur here
 
@@ -381,9 +392,10 @@ func encodeMVTGeometries(geometries []GEOSGeometry) ([]byte, [][]uint32, error) 
 
 	types := make([]byte, size)
 	buffers := make([][]uint32, size)
-
+	var p unsafe.Pointer
 	for i := 0; i < size; i++ {
-		if cArrs[i] == nil {
+		p = unsafe.Pointer(cArrs[i])
+		if p == nil {
 			buffers[i] = nil
 			continue
 		}
@@ -391,11 +403,10 @@ func encodeMVTGeometries(geometries []GEOSGeometry) ([]byte, [][]uint32, error) 
 		types[i] = byte(cTypes[i])
 		buffers[i] = make([]uint32, int(sizes[i]))
 
-		cValues := unsafe.Slice((*C.uint32_t)(cArrs[i]), (int)(sizes[i]))
+		cValues := unsafe.Slice((*C.uint32_t)(p), (int)(sizes[i]))
 		for j, v := range cValues {
 			buffers[i][j] = uint32(v)
 		}
 	}
-
 	return types, buffers, nil
 }

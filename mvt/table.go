@@ -200,7 +200,7 @@ func getColumnType(field arrow.Field) (string, error) {
 	case arrow.FLOAT32, arrow.FLOAT64:
 		return "Float", nil
 	default:
-		return "", fmt.Errorf("type not supported: %v", field.Type.ID)
+		return "", fmt.Errorf("type not supported: %v", field.Type.ID())
 	}
 }
 
@@ -315,6 +315,7 @@ func (t *FeatureTable) EncodeToLayer(name string, tile *tiles.TileID) ([]byte, e
 
 	// project geometries to tile and encode to MVT format
 	index, geomTypes, encodedGeoms, err := t.geometries.ToTile(tile)
+
 	if err != nil {
 		return nil, err
 	}
