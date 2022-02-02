@@ -16,8 +16,8 @@ var EXTENT uint16 = 4096 // vector tile default extent
 type LayerInfo struct {
 	Name        string            `json:"id"`
 	Description string            `json:"description"`
-	Minzoom     uint32            `json:"minzoom"`
-	Maxzoom     uint32            `json:"maxzoom"`
+	Minzoom     uint16            `json:"minzoom"`
+	Maxzoom     uint16            `json:"maxzoom"`
 	Fields      map[string]string `json:"fields"`
 }
 
@@ -200,7 +200,7 @@ func getColumnType(field arrow.Field) (string, error) {
 	case arrow.FLOAT32, arrow.FLOAT64:
 		return "Float", nil
 	default:
-		return "", fmt.Errorf("type not supported: %v", field.Type.ID())
+		return "", fmt.Errorf("field %v: type not supported: %v", field.Name, field.Type.ID())
 	}
 }
 
@@ -429,7 +429,7 @@ func (t *FeatureTable) EncodeToLayer(name string, tile *tiles.TileID) ([]byte, e
 	return buffer, nil
 }
 
-func (t *FeatureTable) GetLayerInfo(name string, description string, minZoom uint32, maxZoom uint32) (*LayerInfo, error) {
+func (t *FeatureTable) GetLayerInfo(name string, description string, minZoom uint16, maxZoom uint16) (*LayerInfo, error) {
 	fields := make(map[string]string)
 	for _, col := range t.columns {
 		fields[col.Name] = col.Type

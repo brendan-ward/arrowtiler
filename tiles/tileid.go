@@ -9,17 +9,17 @@ var CE float64 = 2 * 6378137.0 * math.Pi
 
 // WebMercator tile, numbered starting from upper left
 type TileID struct {
-	Zoom uint32
+	Zoom uint16
 	X    uint32
 	Y    uint32
 }
 
-func NewTileID(zoom, x, y uint32) *TileID {
+func NewTileID(zoom uint16, x uint32, y uint32) *TileID {
 	return &TileID{zoom, x, y}
 }
 
 // GeoToTile calculates the tile x,y at zoom that contains longitude, latitude
-func GeoToTile(zoom uint32, x float64, y float64) *TileID {
+func GeoToTile(zoom uint16, x float64, y float64) *TileID {
 	z2 := 1 << zoom
 	zoomFactor := float64(z2)
 	eps := 1e-14
@@ -56,7 +56,7 @@ func GeoToTile(zoom uint32, x float64, y float64) *TileID {
 // TileRange calculates the min tile x, min tile y, max tile x, max tile y tile
 // range for geographic coordinates xmin, ymin, xmax, ymax at a given zoom level
 // TODO: convert to use Mercator coordinates instead
-func TileRange(zoom uint32, bounds [4]float64) (*TileID, *TileID) {
+func TileRange(zoom uint16, bounds [4]float64) (*TileID, *TileID) {
 	eps := 1.0e-11
 
 	minTile := GeoToTile(zoom, bounds[0], bounds[3])

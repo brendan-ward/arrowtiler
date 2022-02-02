@@ -103,7 +103,7 @@ func writeMetadataItem(con *sqlite.Conn, key string, value interface{}) error {
 	return sqlitex.Exec(con, "INSERT INTO metadata (name,value) VALUES (?, ?)", nil, key, value)
 }
 
-func (db *MBtilesWriter) WriteMetadata(name string, description string, minZoom uint32, maxZoom uint32, bounds [4]float64, layersInfo map[string][]*mvt.LayerInfo) (err error) {
+func (db *MBtilesWriter) WriteMetadata(name string, description string, minZoom uint16, maxZoom uint16, bounds [4]float64, layersInfo map[string][]*mvt.LayerInfo) (err error) {
 	if db == nil || db.pool == nil {
 		return fmt.Errorf("cannot write to closed mbtiles database")
 	}
