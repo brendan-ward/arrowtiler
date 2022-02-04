@@ -71,7 +71,7 @@ func produce(minZoom uint16, maxZoom uint16, bounds [4]float64, queue chan<- *ti
 
 	for zoom := minZoom; zoom <= maxZoom; zoom++ {
 		minTile, maxTile := tiles.TileRange(zoom, bounds)
-		count := (maxTile.X - minTile.X) * (maxTile.Y - minTile.Y)
+		count := ((maxTile.X - minTile.X) + 1) * ((maxTile.Y - minTile.Y) + 1)
 		fmt.Printf("zoom %v: %v tiles\n", zoom, count)
 
 		for x := minTile.X; x <= maxTile.X; x++ {
