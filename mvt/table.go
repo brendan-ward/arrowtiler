@@ -1,8 +1,11 @@
 package mvt
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/apache/arrow/go/arrow"
 	"github.com/apache/arrow/go/arrow/array"
@@ -29,7 +32,7 @@ type FeatureTable struct {
 	columns    []*ByteColumn
 }
 
-func ReadFeather(path string, geomColName string, idColName string) (*FeatureTable, error) {
+func ReadFeather(path string, idColName string) (*FeatureTable, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -51,6 +54,11 @@ func ReadFeather(path string, geomColName string, idColName string) (*FeatureTab
 		}
 	}
 	t := array.NewTableFromRecords(r.Schema(), records)
+
+	geomColName, err := parseMetadata(t.Schema().Metadata())
+	if err != nil {
+		return nil, err
+	}
 
 	i := 0
 	var col *array.Chunked
@@ -187,6 +195,59 @@ func (t *FeatureTable) Size() int {
 		return 0
 	}
 	return t.geometries.Size()
+}
+
+func parseMetadata(metadata arrow.Metadata) (string, error) {
+	metaGeoIdx := metadata.FindKey("geo")
+	if metaGeoIdx == -1 {
+		return "", errors.New("feather file does not contain required geo metadata")
+	}
+
+	var geoMetadata map[string]interface{}
+	err := json.Unmarshal(([]byte)(metadata.Values()[metaGeoIdx]), &geoMetadata)
+	if err != nil {
+		return "", fmt.Errorf("could not parse geo metadata; %q", err)
+	}
+
+	// get the primary geometry column
+	geoColName, ok := geoMetadata["primary_column"]
+	if !ok {
+		return "", errors.New("metadata is missing required 'primary_column' key")
+	}
+
+	// get the columns
+	colMeta, ok := geoMetadata["columns"]
+	if !ok {
+		return "", errors.New("metadata is missing required 'columns' key")
+	}
+
+	geoColMetaRaw, ok := colMeta.(map[string]interface{})[geoColName.(string)]
+	if !ok {
+		return "", fmt.Errorf("'%v' column metadata is not present in 'columns' metadata", geoColName)
+	}
+
+	geoColMeta := geoColMetaRaw.(map[string]interface{})
+
+	encoding, ok := geoColMeta["encoding"]
+	if !ok {
+		return "", errors.New("metadata is missing required 'encoding' key")
+	}
+	if encoding.(string) != "WKB" {
+		return "", fmt.Errorf("encoding is not supported '%v'", encoding)
+	}
+
+	crs, ok := geoColMeta["crs"]
+	if !ok {
+		return "", errors.New("metadata is missing required 'crs' key")
+	}
+
+	// Extremely lightweight validation of goegraphic WKT; bringing in PROJ
+	// for this seems way too heavy, and parsing WKT is a pain
+	if !(strings.HasPrefix(crs.(string), `GEOGCRS["WGS 84"`) || strings.ReplaceAll(crs.(string), " ", "") == "EPSG:4326") {
+		return "", errors.New("input CRS does not appear to be WGS 84 (geographic coordinates)")
+	}
+
+	return geoColName.(string), nil
 }
 
 func getColumnType(field arrow.Field) (string, error) {

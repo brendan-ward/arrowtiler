@@ -19,6 +19,7 @@ var tilesetName string
 var layerName string
 var description string
 var numWorkers int
+var idColumm string
 
 var createCmd = &cobra.Command{
 	Use:   "create [IN.feather] [OUT.mbtiles]",
@@ -50,10 +51,9 @@ var createCmd = &cobra.Command{
 			return errors.New("maxzoom must be no smaller than minzoom")
 		}
 
-		create(args[0], args[1])
-
-		return nil
+		return create(args[0], args[1])
 	},
+	SilenceUsage: true,
 }
 
 func init() {
@@ -62,6 +62,7 @@ func init() {
 	createCmd.Flags().StringVarP(&layerName, "layer", "l", "", "layer name")
 	createCmd.Flags().StringVarP(&tilesetName, "name", "n", "", "tileset name")
 	createCmd.Flags().StringVar(&description, "description", "", "tileset description")
+	createCmd.Flags().StringVar(&idColumm, "id", "", "column to use as feature ID (must be integer type)")
 	createCmd.Flags().IntVarP(&numWorkers, "workers", "w", 4, "number of workers to create tiles")
 }
 
@@ -81,12 +82,12 @@ func produce(minZoom uint16, maxZoom uint16, bounds [4]float64, queue chan<- *ti
 	}
 }
 
-func create(infilename string, outfilename string) {
+func create(infilename string, outfilename string) error {
 	// coordinates projected to Mercator on read
 	fmt.Printf("Reading features from %v\n", infilename)
-	features, err := mvt.ReadFeather(infilename, "geometry", "")
+	features, err := mvt.ReadFeather(infilename, idColumm)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer features.Geometry().Release()
 
@@ -147,5 +148,5 @@ func create(infilename string, outfilename string) {
 
 	wg.Wait()
 
-	fmt.Println("Done!")
+	return nil
 }
