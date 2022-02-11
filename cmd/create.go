@@ -11,6 +11,8 @@ import (
 	"github.com/brendan-ward/arrowtiler/mvt"
 	"github.com/brendan-ward/arrowtiler/tiles"
 	"github.com/spf13/cobra"
+
+	"github.com/gosuri/uiprogress"
 )
 
 var minzoom uint16
@@ -69,17 +71,27 @@ func init() {
 func produce(minZoom uint16, maxZoom uint16, bounds [4]float64, queue chan<- *tiles.TileID) {
 	defer close(queue)
 
+	fmt.Println("Creating tiles")
+
+	uiprogress.Start()
+
 	for zoom := minZoom; zoom <= maxZoom; zoom++ {
+		z := zoom
 		minTile, maxTile := tiles.TileRange(zoom, bounds)
-		count := ((maxTile.X - minTile.X) + 1) * ((maxTile.Y - minTile.Y) + 1)
-		fmt.Printf("zoom %v: %v tiles\n", zoom, count)
+		count := ((maxTile.X - minTile.X) * (maxTile.Y - minTile.Y)) + 1
+		bar := uiprogress.AddBar(int(count)).AppendCompleted().PrependElapsed()
+		bar.PrependFunc(func(b *uiprogress.Bar) string {
+			return fmt.Sprintf("zoom %2v (%8v/%8v)", z, b.Current(), count)
+		})
 
 		for x := minTile.X; x <= maxTile.X; x++ {
 			for y := minTile.Y; y <= maxTile.Y; y++ {
 				queue <- &tiles.TileID{Zoom: zoom, X: x, Y: y}
+				bar.Incr()
 			}
 		}
 	}
+	uiprogress.Stop()
 }
 
 func create(infilename string, outfilename string) error {
@@ -116,7 +128,7 @@ func create(infilename string, outfilename string) error {
 
 	db.WriteMetadata(tilesetName, description, minzoom, maxzoom, geoBounds, layersInfo)
 
-	queue := make(chan *tiles.TileID, 100)
+	queue := make(chan *tiles.TileID)
 	var wg sync.WaitGroup
 
 	go produce(minzoom, maxzoom, geoBounds, queue)
