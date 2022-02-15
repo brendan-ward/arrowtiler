@@ -270,103 +270,6 @@ finish:
   return geoms;
 }
 
-/* Create a Polygon from bounding coordinates.
- *
- * Parameters
- * ----------
- * ctx: GEOS context ctx
- * xmin: minimum X value
- * ymin: minimum Y value
- * xmax: maximum X value
- * ymax: maximum Y value
- *
- * Returns
- * -------
- * GEOSGeometry* on success (owned by caller) or
- * NULL on failure
- */
-GEOSGeometry *create_box(GEOSContextHandle_t ctx, double xmin, double ymin,
-                         double xmax, double ymax) {
-
-  GEOSCoordSequence *coords = NULL;
-  GEOSGeometry *geom = NULL;
-  GEOSGeometry *ring = NULL;
-
-  // Construct coordinate sequence and set vertices
-  coords = GEOSCoordSeq_create_r(ctx, 5, 2);
-  if (coords == NULL) {
-    return NULL;
-  }
-
-  // TODO: setxy
-  // CCW from bottom right (xmax, ymin) to match shapely
-  if (!(GEOSCoordSeq_setX_r(ctx, coords, 0, xmax) &&
-        GEOSCoordSeq_setY_r(ctx, coords, 0, ymin) &&
-        GEOSCoordSeq_setX_r(ctx, coords, 1, xmax) &&
-        GEOSCoordSeq_setY_r(ctx, coords, 1, ymax) &&
-        GEOSCoordSeq_setX_r(ctx, coords, 2, xmin) &&
-        GEOSCoordSeq_setY_r(ctx, coords, 2, ymax) &&
-        GEOSCoordSeq_setX_r(ctx, coords, 3, xmin) &&
-        GEOSCoordSeq_setY_r(ctx, coords, 3, ymin) &&
-        GEOSCoordSeq_setX_r(ctx, coords, 4, xmax) &&
-        GEOSCoordSeq_setY_r(ctx, coords, 4, ymin))) {
-    if (coords != NULL) {
-      GEOSCoordSeq_destroy_r(ctx, coords);
-    }
-
-    return NULL;
-  }
-
-  // Construct linear ring then use to construct polygon
-  // Note: coords are owned by ring; if ring fails to construct, it will
-  // automatically clean up the coords
-  ring = GEOSGeom_createLinearRing_r(ctx, coords);
-  if (ring == NULL) {
-    return NULL;
-  }
-
-  // Note: ring is owned by polygon; if polygon fails to construct, it will
-  // automatically clean up the ring
-  geom = GEOSGeom_createPolygon_r(ctx, ring, NULL, 0);
-  if (geom == NULL) {
-    return NULL;
-  }
-
-  return geom;
-}
-
-/* Get the bounds of a geometry
- *
- * Parameters
- * ----------
- * ctx: GEOS context ctx
- * geom: GEOS geometry object
- * xmin: double pointer to receive xmin value
- * ymin: double pointer to receive ymin value
- * xmax: double pointer to receive xmax value
- * ymax: double pointer to receive ymax value
- *
- * * Returns 0 on failure
- */
-int get_geometry_bounds(GEOSContextHandle_t ctx, GEOSGeometry *geom,
-                        double *xmin, double *ymin, double *xmax,
-                        double *ymax) {
-
-  // can't get bounds of empty geometries; fail
-  if (geom == NULL || GEOSisEmpty_r(ctx, geom)) {
-    return 0;
-  }
-
-  if (!(GEOSGeom_getXMin_r(ctx, geom, xmin) &&
-        GEOSGeom_getYMin_r(ctx, geom, ymin) &&
-        GEOSGeom_getXMax_r(ctx, geom, xmax) &&
-        GEOSGeom_getYMax_r(ctx, geom, ymax))) {
-    return 0;
-  }
-
-  return 1;
-}
-
 /* Get the total bounds of an array of geometries
  *
  * Parameters
@@ -403,8 +306,8 @@ int get_total_bounds(GEOSGeometry **geometries, size_t count, double *xmin,
       continue;
     }
 
-    if (!get_geometry_bounds(ctx, geom, &geom_xmin, &geom_ymin, &geom_xmax,
-                             &geom_ymax)) {
+    if (!GEOSGeom_getExtent_r(ctx, geom, &geom_xmin, &geom_ymin, &geom_xmax,
+                              &geom_ymax)) {
       return 0;
     }
     if (geom_xmin < total_xmin) {
@@ -551,7 +454,8 @@ int query_tree(STRtree *tree, double xmin, double ymin, double xmax,
 
   GEOS_INIT;
 
-  GEOSGeometry *envelope = create_box(ctx, xmin, ymin, xmax, ymax);
+  GEOSGeometry *envelope =
+      GEOSGeom_createRectangle_r(ctx, xmin, ymin, xmax, ymax);
   if (envelope == NULL) {
     printf("could not create box to query STRtree");
     errstate = GEOSERROR;
@@ -588,20 +492,17 @@ finish:
  *
  * Parameters
  * ----------
- * x: input x
- * y: input y
- * x_out: pointer to receive projected x
- * y_out: pointer to receive projected y
+ * x: pointer to receive projected x
+ * y: pointer to receive projected y
  * userdata: not used for this function
  */
-int geo_to_mercator_coords(double x, double y, double *x_out, double *y_out,
-                           void *userdata) {
-  *x_out = LON_FAC * x;
-  *y_out = RE * log(tan((M_PI * 0.25) + (0.5 * DEG2RAD * y)));
+int geo_to_mercator_coords(double *x, double *y, void *userdata) {
+  *x = LON_FAC * (*x);
+  *y = RE * log(tan((M_PI * 0.25) + (0.5 * DEG2RAD * (*y))));
 
   // if y is very small, make it 0
-  if (*y_out > -1e-6 && *y_out < 1e-6) {
-    *y_out = 0;
+  if ((*y) > -1e-6 && (*y) < 1e-6) {
+    (*y) = 0;
   }
 
   return 1;
@@ -612,260 +513,17 @@ int geo_to_mercator_coords(double x, double y, double *x_out, double *y_out,
  *
  * Parameters
  * ----------
- * x: input x
- * y: input y
- * x_out: pointer to receive projected x
- * y_out: pointer to receive projected y
+ * x: pointer to receive projected x
+ * y: pointer to receive projected y
  * userdata: struct containing xmin, ymin, xmax, ymax for scaling
  */
-int mercator_to_tile_coords(double x, double y, double *x_out, double *y_out,
-                            void *userdata) {
+int mercator_to_tile_coords(double *x, double *y, void *userdata) {
 
   ScaleParams *params = (ScaleParams *)(userdata);
-  *x_out = x * params->xscale + params->xoffset;
-  *y_out = y * params->yscale + params->yoffset;
+  *x = (*x) * params->xscale + params->xoffset;
+  *y = (*y) * params->yscale + params->yoffset;
 
   return 1;
-}
-
-/*
- * Applies coord_func to the coordinates in geom for simple geometry types.
- * Geometry must be non-empty.
- *
- * Parameters
- * ----------
- * ctx: GEOS context handle
- * geom: GEOS Geometry object (Point, LineString, LinearRing only)
- * coord_func: function applied to coordinates to perform projection (see
- * coord_project_func type) Returns
- * --------
- * pointer to GEOS Geometry object
- */
-GEOSGeometry *project_geometry(GEOSContextHandle_t ctx,
-                               const GEOSGeometry *geom,
-                               coord_project_func *coord_func, void *userdata) {
-  GEOSGeometry *out = NULL;
-  const GEOSCoordSequence *seq;
-  GEOSCoordSequence *out_seq;
-  unsigned int size;
-  int geom_type;
-  double lon, lat;
-  double x, y;
-
-  seq = GEOSGeom_getCoordSeq_r(ctx, geom);
-  if (seq == NULL) {
-    printf("ERROR: could not get coordinate sequence for geometry\n");
-    return NULL;
-  }
-
-  if (!GEOSCoordSeq_getSize_r(ctx, seq, &size)) {
-    printf("ERROR: could not get coordinates for coordinate sequence\n");
-    return NULL;
-  }
-
-  out_seq = GEOSCoordSeq_create_r(ctx, size, 2);
-  if (out_seq == NULL) {
-    printf("ERROR: could not create new coordinate sequence\n");
-    return NULL;
-  }
-
-  for (int i = 0; i < size; i++) {
-    if (!GEOSCoordSeq_getXY_r(ctx, seq, i, &lon, &lat)) {
-      printf("ERROR: could not get coordinates for coordinate sequence\n");
-      goto fail;
-    }
-
-    coord_func(lon, lat, &x, &y, userdata);
-
-    if (!GEOSCoordSeq_setXY_r(ctx, out_seq, i, x, y)) {
-      printf("ERROR: could not set coordinates into coordinate sequence\n");
-      goto fail;
-    }
-  }
-
-  // Note: the coordinate sequence becomes owned by the new geometry
-  switch (GEOSGeomTypeId_r(ctx, geom)) {
-  case GEOS_POINT: {
-    out = GEOSGeom_createPoint_r(ctx, out_seq);
-    break;
-  }
-  case GEOS_LINESTRING: {
-    out = GEOSGeom_createLineString_r(ctx, out_seq);
-    break;
-  }
-  case GEOS_LINEARRING: {
-    out = GEOSGeom_createLinearRing_r(ctx, out_seq);
-    break;
-  }
-  }
-
-  if (out == NULL) {
-    goto fail;
-  }
-
-  return out;
-
-fail:
-  GEOSCoordSeq_destroy_r(ctx, out_seq);
-  return NULL;
-}
-
-/*
- * Applies coord_func to the coordinates in geom for singular polygon type
- * Geometry must be non-empty.
- *
- * Parameters
- * ----------
- * ctx: GEOS context handle
- * geom: GEOS Geometry object (Polygon only)
- * coord_func: function applied to coordinates to perform projection (see
- * coord_project_func type) Returns
- * --------
- * pointer to GEOS Geometry object
- */
-GEOSGeometry *project_polygon(GEOSContextHandle_t ctx, const GEOSGeometry *geom,
-                              coord_project_func *coord_func, void *userdata) {
-
-  const GEOSGeometry *ring;
-  GEOSGeometry *out, *out_ring;
-  GEOSGeometry **out_rings;
-  int num_rings, i, j;
-  char errstate = SUCCESS;
-
-  ring = GEOSGetExteriorRing_r(ctx, geom);
-  if (ring == NULL) {
-    printf("ERROR: could not get exterior ring for polygon\n");
-    return NULL;
-  }
-
-  out_ring = project_geometry(ctx, ring, coord_func, userdata);
-  if (out_ring == NULL) {
-    // error should already be set
-    return NULL;
-  }
-
-  num_rings = GEOSGetNumInteriorRings_r(ctx, geom);
-  out_rings = malloc(sizeof(GEOSGeometry *) * num_rings);
-
-  for (i = 0; i < num_rings; i++) {
-    ring = GEOSGetInteriorRingN_r(ctx, geom, i);
-    if (ring == NULL) {
-      printf("ERROR: could not get interior ring %i for polygon\n", i);
-      errstate = GEOSERROR;
-      goto finish;
-    }
-
-    out_rings[i] = project_geometry(ctx, ring, coord_func, userdata);
-    if (out_rings[i] == NULL) {
-      // error should already be set
-      errstate = GEOSERROR;
-      goto finish;
-    }
-  }
-
-  // new rings become owned by out geometry
-  out = GEOSGeom_createPolygon_r(ctx, out_ring, out_rings, num_rings);
-  if (out == NULL) {
-    printf("ERROR: could not create new polygon\n");
-    errstate = GEOSERROR;
-  }
-
-finish:
-  if (errstate == GEOSERROR) {
-    if (out_ring != NULL) {
-      GEOSGeom_destroy_r(ctx, out_ring);
-    }
-    if (out_rings != NULL) {
-      for (j = 0; j < i; j++) {
-        if (out_rings[i] != NULL) {
-          GEOSGeom_destroy_r(ctx, out_rings[i]);
-        }
-      }
-    }
-  }
-
-  if (out_rings != NULL) {
-    free(out_rings);
-  }
-
-  return out;
-}
-
-/*
- * Applies coord_func to the coordinates in geom for singular polygon type
- * Geometry must be non-empty.
- *
- * Parameters
- * ----------
- * ctx: GEOS context handle
- * geom: GEOS Geometry object (Polygon only)
- * coord_func: function applied to coordinates to perform projection (see
- * coord_project_func type) Returns
- * --------
- * pointer to GEOS Geometry object
- */
-GEOSGeometry *project_multi_geometry(GEOSContextHandle_t ctx,
-                                     const GEOSGeometry *geom,
-                                     coord_project_func *coord_func,
-                                     void *userdata) {
-
-  const GEOSGeometry *subgeom;
-  GEOSGeometry *out;
-  GEOSGeometry **out_sub_geoms;
-  int i, j, num_geoms, geom_type;
-  char errstate = SUCCESS;
-  geometry_project_func *proj_func = NULL;
-
-  geom_type = GEOSGeomTypeId_r(ctx, geom);
-  num_geoms = GEOSGetNumGeometries_r(ctx, geom);
-  out_sub_geoms = malloc(sizeof(GEOSGeometry *) * num_geoms);
-
-  if (geom_type == GEOS_MULTIPOLYGON) {
-    proj_func = project_polygon;
-  } else {
-    proj_func = project_geometry;
-  }
-
-  for (i = 0; i < num_geoms; i++) {
-    subgeom = GEOSGetGeometryN_r(ctx, geom, i);
-    if (subgeom == NULL) {
-      printf("ERROR: Could not get geometry %i\n", i);
-      errstate = GEOSERROR;
-      goto finish;
-    }
-
-    out_sub_geoms[i] = proj_func(ctx, subgeom, coord_func, userdata);
-
-    if (out_sub_geoms[i] == NULL) {
-      // error should already be reported
-      errstate = GEOSERROR;
-      goto finish;
-    }
-  }
-
-  out = GEOSGeom_createCollection_r(ctx, geom_type, out_sub_geoms, num_geoms);
-  if (out == NULL) {
-    printf("ERROR: could not create collection from new geometries\n");
-    errstate = GEOSERROR;
-    goto finish;
-  }
-
-finish:
-  if (errstate == GEOSERROR) {
-    if (out_sub_geoms != NULL) {
-      for (j = 0; j < i; j++) {
-        if (out_sub_geoms[i] != NULL) {
-          GEOSGeom_destroy_r(ctx, out_sub_geoms[i]);
-        }
-      }
-    }
-  }
-
-  if (out_sub_geoms != NULL) {
-    free(out_sub_geoms);
-  }
-
-  return out;
 }
 
 /**
@@ -893,7 +551,6 @@ GEOSGeometry **project_to_mercator(GEOSGeometry **geometries, size_t count) {
   GEOSGeometry **out_geoms = NULL;
   int i, j, geom_type;
   double geom_xmin, geom_ymin, geom_xmax, geom_ymax;
-  geometry_project_func *proj_func = NULL;
 
   GEOS_INIT;
 
@@ -916,8 +573,8 @@ GEOSGeometry **project_to_mercator(GEOSGeometry **geometries, size_t count) {
       goto finish;
     }
 
-    if (!get_geometry_bounds(ctx, geom, &geom_xmin, &geom_ymin, &geom_xmax,
-                             &geom_ymax)) {
+    if (!GEOSGeom_getExtent_r(ctx, geom, &geom_xmin, &geom_ymin, &geom_xmax,
+                              &geom_ymax)) {
       printf("ERROR: could not calculate bounds of geometry at index %i\n", i);
       errstate = GEOSERROR;
       goto finish;
@@ -925,7 +582,6 @@ GEOSGeometry **project_to_mercator(GEOSGeometry **geometries, size_t count) {
 
     if (!(geom_xmin > WORLD_BOUNDS[0] && geom_ymin > WORLD_BOUNDS[1] &&
           geom_xmax < WORLD_BOUNDS[2] && geom_ymax < WORLD_BOUNDS[3])) {
-
       // printf("INFO: Clipping geometry to world bounds\n");
 
       // TODO: wrap X if needed
@@ -947,25 +603,10 @@ GEOSGeometry **project_to_mercator(GEOSGeometry **geometries, size_t count) {
         continue;
       }
 
-      // get type again in case changed by clip
-      geom_type = GEOSGeomTypeId_r(ctx, out_geoms[i]);
       geom = out_geoms[i];
     }
 
-    if (geom_type == GEOS_POINT || geom_type == GEOS_LINESTRING) {
-      proj_func = project_geometry;
-    } else if (geom_type == GEOS_POLYGON) {
-      proj_func = project_polygon;
-    } else {
-      proj_func = project_multi_geometry;
-    }
-
-    new_geom = proj_func(ctx, geom, geo_to_mercator_coords, NULL);
-    if (new_geom == NULL) {
-      // error should already be reported
-      errstate = GEOSERROR;
-      goto finish;
-    }
+    new_geom = GEOSGeom_transformXY_r(ctx, geom, geo_to_mercator_coords, NULL);
 
     // delete prior, if exists, before setting new values
     if (out_geoms[i] != NULL) {
@@ -1014,7 +655,6 @@ GEOSGeometry **clip_project_to_tile(GEOSGeometry **geometries, size_t count,
   int i, j, geom_type, new_geom_type, num_coords, num_sub_geoms;
   char is_same_type;
   GEOSGeometry *geom, *new_geom;
-  geometry_project_func *proj_func = NULL;
 
   GEOS_INIT;
 
@@ -1025,6 +665,7 @@ GEOSGeometry **clip_project_to_tile(GEOSGeometry **geometries, size_t count,
   double min_width = (xrange / extent) / 2.0;
   double min_height = (yrange / extent) / 2.0;
 
+  // TODO: this can be dropped to 80px to match GDAL
   // buffer the tile by 256 units (same as PostGIS default) out of the extent
   double xbuffer = xrange * (256.0 / (double)extent);
   double ybuffer = yrange * (256.0 / (double)extent);
@@ -1051,8 +692,8 @@ GEOSGeometry **clip_project_to_tile(GEOSGeometry **geometries, size_t count,
     // what PostGIS does)
     if (geom_type == GEOS_POLYGON || geom_type == GEOS_MULTIPOLYGON ||
         geom_type == GEOS_LINESTRING || geom_type == GEOS_MULTILINESTRING) {
-      if (!get_geometry_bounds(ctx, geom, &geom_xmin, &geom_ymin, &geom_xmax,
-                               &geom_ymax)) {
+      if (!GEOSGeom_getExtent_r(ctx, geom, &geom_xmin, &geom_ymin, &geom_xmax,
+                                &geom_ymax)) {
         printf("ERROR: could not calculate bounds of geometry\n");
         errstate = GEOSERROR;
         goto finish;
@@ -1086,16 +727,8 @@ GEOSGeometry **clip_project_to_tile(GEOSGeometry **geometries, size_t count,
       geom = out_geoms[i];
     }
 
-    if (geom_type == GEOS_POINT || geom_type == GEOS_LINESTRING) {
-      proj_func = project_geometry;
-    } else if (geom_type == GEOS_POLYGON) {
-      proj_func = project_polygon;
-    } else {
-      proj_func = project_multi_geometry;
-    }
-
-    new_geom =
-        proj_func(ctx, geom, mercator_to_tile_coords, (void *)(&scale_params));
+    new_geom = GEOSGeom_transformXY_r(ctx, geom, mercator_to_tile_coords,
+                                      (void *)(&scale_params));
     if (new_geom == NULL) {
       // error should already be reported
       errstate = GEOSERROR;

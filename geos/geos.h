@@ -39,16 +39,6 @@ struct ScaleParams_t {
 
 typedef struct ScaleParams_t ScaleParams;
 
-// projects x,y to x_out, y_out, possibly using userdata
-// returns 1 on success, 0 on error
-typedef int coord_project_func(double x, double y, double *x_out, double *y_out,
-                               void *userdata);
-
-typedef GEOSGeometry *geometry_project_func(GEOSContextHandle_t ctx,
-                                            const GEOSGeometry *geom,
-                                            coord_project_func *coord_func,
-                                            void *userdata);
-
 // error handling
 enum { GEOSERROR, ERROR, WARNING, SUCCESS };
 

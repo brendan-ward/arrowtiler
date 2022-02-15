@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/brendan-ward/arrowtiler/mbtiles"
@@ -95,6 +97,11 @@ func produce(minZoom uint16, maxZoom uint16, bounds [4]float64, queue chan<- *ti
 }
 
 func create(infilename string, outfilename string) error {
+	// set defaults
+	if layerName == "" {
+		layerName = strings.TrimSuffix(path.Base(infilename), filepath.Ext(infilename))
+	}
+
 	// coordinates projected to Mercator on read
 	fmt.Printf("Reading features from %v\n", infilename)
 	features, err := mvt.ReadFeather(infilename, idColumm)

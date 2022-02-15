@@ -19,7 +19,7 @@ created using tippecanoe.
 Requires:
 
 -   Go >= 1.17
--   GEOS >= 3.9.0
+-   GEOS >= 3.11.0
 
 ## Why arrowtiler?
 
@@ -43,6 +43,8 @@ While it is possible to build in support for geospatial formats using
 for I/O.
 
 At present, geometries are encoded as WKB bytes in a GeoArrow file.
+
+Input geometries must be in geographic coordinates (WGS 1984 / "EPSG:4326").
 
 ## How it works
 
@@ -74,3 +76,4 @@ Inspired by:
 
 -   [tippecanoe](https://github.com/mapbox/tippecanoe)
 -   [Golang MVT writer](https://github.com/tidwall/mvt)
+-   Some Geographic / Spherical Mercator calculations derived from [mercantile](https://github.com/mapbox/mercantile)
