@@ -120,8 +120,10 @@ func (db *MBtilesWriter) WriteMetadata(name string, description string, minZoom 
 	if err = writeMetadataItem(con, "name", name); err != nil {
 		return err
 	}
-	if err = writeMetadataItem(con, "description", description); err != nil {
-		return err
+	if description != "" {
+		if err = writeMetadataItem(con, "description", description); err != nil {
+			return err
+		}
 	}
 	if err = writeMetadataItem(con, "minzoom", minZoom); err != nil {
 		return err

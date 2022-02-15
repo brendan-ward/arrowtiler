@@ -101,6 +101,9 @@ func create(infilename string, outfilename string) error {
 	if layerName == "" {
 		layerName = strings.TrimSuffix(path.Base(infilename), filepath.Ext(infilename))
 	}
+	if tilesetName == "" {
+		tilesetName = layerName
+	}
 
 	// coordinates projected to Mercator on read
 	fmt.Printf("Reading features from %v\n", infilename)

@@ -3,7 +3,7 @@ module github.com/brendan-ward/arrowtiler
 go 1.17
 
 require (
-	crawshaw.io/sqlite v0.3.2
+	crawshaw.io/sqlite v0.3.3-0.20211227050848-2cdb5c1a86a1
 	github.com/apache/arrow/go/arrow v0.0.0-20211112161151-bc219186db40
 	github.com/gosuri/uiprogress v0.0.1
 	github.com/spf13/cobra v1.3.0
