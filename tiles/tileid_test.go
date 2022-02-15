@@ -54,29 +54,34 @@ func Test_TileRange(t *testing.T) {
 		{zoom: 1, bounds: [4]float64{-180, -90, 0, 90}, minTile: &TileID{1, 0, 0}, maxTile: &TileID{1, 0, 1}},
 		{zoom: 1, bounds: [4]float64{-180, -90, -170, -80}, minTile: &TileID{1, 0, 1}, maxTile: &TileID{1, 0, 1}},
 		{zoom: 4, bounds: [4]float64{-100, -20, -20, 20}, minTile: &TileID{4, 3, 7}, maxTile: &TileID{4, 7, 8}},
-		{zoom: 4, bounds: [4]float64{-118.228, -1.590e-14, -1.272e-14, 48.9998}, minTile: &TileID{4, 2, 5}, maxTile: &TileID{4, 7, 7}},
+		{zoom: 4, bounds: [4]float64{-118.22826385, 17.93906593, -65.33223724, 48.99859619}, minTile: &TileID{4, 2, 5}, maxTile: &TileID{4, 5, 7}},
+		{zoom: 4, bounds: [4]float64{-1e-6, -1e-6, 1e-6, 1e-6}, minTile: &TileID{4, 7, 7}, maxTile: &TileID{4, 8, 8}},
 	}
 
 	for _, tc := range tests {
-		minTile, maxTile := TileRange(tc.zoom, tc.bounds)
+		// convert to Mercator
+		xmin, ymin := GeoToMercator(tc.bounds[0], tc.bounds[1])
+		xmax, ymax := GeoToMercator(tc.bounds[2], tc.bounds[3])
+
+		minTile, maxTile := TileRange(tc.zoom, [4]float64{xmin, ymin, xmax, ymax})
 
 		if minTile.Zoom != tc.zoom {
 			t.Errorf("minTile %v | zoom not expected value: %v\n", minTile, tc.zoom)
 		}
 		if minTile.X != tc.minTile.X {
-			t.Errorf("minTile %v | x not expected value: %v\n", minTile, tc.minTile.X)
+			t.Errorf("minTile %v | x not expected value: %v\n", minTile, tc.minTile)
 		}
 		if minTile.Y != tc.minTile.Y {
-			t.Errorf("minTile %v | y not expected value: %v\n", minTile, tc.minTile.Y)
+			t.Errorf("minTile %v | y not expected value: %v\n", minTile, tc.minTile)
 		}
 		if maxTile.Zoom != tc.zoom {
 			t.Errorf("maxTile %v | zoom not expected value: %v\n", maxTile, tc.zoom)
 		}
 		if maxTile.X != tc.maxTile.X {
-			t.Errorf("maxTile %v | x not expected value: %v\n", maxTile, tc.maxTile.X)
+			t.Errorf("maxTile %v | x not expected value: %v\n", maxTile, tc.maxTile)
 		}
 		if maxTile.Y != tc.maxTile.Y {
-			t.Errorf("maxTile %v | y not expected value: %v\n", maxTile, tc.maxTile.Y)
+			t.Errorf("maxTile %v | y not expected value: %v\n", maxTile, tc.maxTile)
 		}
 	}
 }

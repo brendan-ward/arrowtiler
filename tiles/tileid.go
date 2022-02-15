@@ -5,7 +5,10 @@ import (
 	"math"
 )
 
-var CE float64 = 2 * 6378137.0 * math.Pi
+var RE float64 = 6378137.0
+var ORIGIN = RE * math.Pi
+var CE float64 = 2.0 * ORIGIN
+var DEG2RAD float64 = math.Pi / 180.0
 
 // WebMercator tile, numbered starting from upper left
 type TileID struct {
@@ -16,6 +19,16 @@ type TileID struct {
 
 func NewTileID(zoom uint16, x uint32, y uint32) *TileID {
 	return &TileID{zoom, x, y}
+}
+
+func GeoToMercator(lon float64, lat float64) (x float64, y float64) {
+	// truncate incoming values to world bounds
+	lon = math.Min(math.Max(lon, -180), 180)
+	lat = math.Min(math.Max(lat, -85.051129), 85.051129)
+
+	x = lon * ORIGIN / 180.0
+	y = RE * math.Log(math.Tan((math.Pi*0.25)+(0.5*DEG2RAD*lat)))
+	return
 }
 
 // GeoToTile calculates the tile x,y at zoom that contains longitude, latitude
@@ -54,13 +67,23 @@ func GeoToTile(zoom uint16, x float64, y float64) *TileID {
 }
 
 // TileRange calculates the min tile x, min tile y, max tile x, max tile y tile
-// range for geographic coordinates xmin, ymin, xmax, ymax at a given zoom level
-// TODO: convert to use Mercator coordinates instead
+// range for Mercator coordinates xmin, ymin, xmax, ymax at a given zoom level.
+// Assumes bounds have already been clipped to Mercator world bounds.
 func TileRange(zoom uint16, bounds [4]float64) (*TileID, *TileID) {
+	z2 := 1 << zoom
+	zoomFactor := float64(z2)
+	origin := -ORIGIN
 	eps := 1.0e-11
 
-	minTile := GeoToTile(zoom, bounds[0], bounds[3])
-	maxTile := GeoToTile(zoom, bounds[2]-eps, bounds[1]+eps)
+	xmin := math.Min(math.Max(math.Floor(((bounds[0]-origin)/CE)*zoomFactor), 0), zoomFactor-1)
+	// ymin isn't right yet, spilling over
+	ymin := math.Min(math.Max(math.Floor(((1.0-(((bounds[1]-origin)/CE)+eps))*zoomFactor)), 0), zoomFactor-1)
+	xmax := math.Min(math.Max(math.Floor((((bounds[2]-origin)/CE)-eps)*zoomFactor), 0), zoomFactor-1)
+	ymax := math.Min(math.Max(math.Floor((1.0-((bounds[3]-origin)/CE))*zoomFactor), 0), zoomFactor-1)
+
+	// tiles start in upper left, flip y values
+	minTile := &TileID{Zoom: zoom, X: uint32(xmin), Y: uint32(ymax)}
+	maxTile := &TileID{Zoom: zoom, X: uint32(xmax), Y: uint32(ymin)}
 
 	return minTile, maxTile
 }

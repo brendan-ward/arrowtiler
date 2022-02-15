@@ -18,8 +18,6 @@ const unsigned char MVT_GEOM_LINE = 2;
 const unsigned char MVT_GEOM_POLYGON = 3;
 
 // projection constants
-const double MERCATOR_ORIGIN = 20037508.342789;
-const double CE = 2 * 6378137.0 * M_PI;
 const double RE = 6378137.0;
 const double DEG2RAD = M_PI / 180;
 // calculate value to multiply by longitude to get Mercator

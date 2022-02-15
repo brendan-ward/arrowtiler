@@ -138,7 +138,7 @@ func create(infilename string, outfilename string) error {
 	queue := make(chan *tiles.TileID)
 	var wg sync.WaitGroup
 
-	go produce(minzoom, maxzoom, geoBounds, queue)
+	go produce(minzoom, maxzoom, mercatorBounds, queue)
 
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
