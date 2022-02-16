@@ -12,12 +12,12 @@ var DEG2RAD float64 = math.Pi / 180.0
 
 // WebMercator tile, numbered starting from upper left
 type TileID struct {
-	Zoom uint16
+	Zoom uint8
 	X    uint32
 	Y    uint32
 }
 
-func NewTileID(zoom uint16, x uint32, y uint32) *TileID {
+func NewTileID(zoom uint8, x uint32, y uint32) *TileID {
 	return &TileID{zoom, x, y}
 }
 
@@ -32,7 +32,7 @@ func GeoToMercator(lon float64, lat float64) (x float64, y float64) {
 }
 
 // GeoToTile calculates the tile x,y at zoom that contains longitude, latitude
-func GeoToTile(zoom uint16, x float64, y float64) *TileID {
+func GeoToTile(zoom uint8, x float64, y float64) *TileID {
 	z2 := 1 << zoom
 	zoomFactor := float64(z2)
 	eps := 1e-14
@@ -69,7 +69,7 @@ func GeoToTile(zoom uint16, x float64, y float64) *TileID {
 // TileRange calculates the min tile x, min tile y, max tile x, max tile y tile
 // range for Mercator coordinates xmin, ymin, xmax, ymax at a given zoom level.
 // Assumes bounds have already been clipped to Mercator world bounds.
-func TileRange(zoom uint16, bounds [4]float64) (*TileID, *TileID) {
+func TileRange(zoom uint8, bounds [4]float64) (*TileID, *TileID) {
 	z2 := 1 << zoom
 	zoomFactor := float64(z2)
 	origin := -ORIGIN

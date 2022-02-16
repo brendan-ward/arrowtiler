@@ -16,8 +16,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var minzoom uint16
-var maxzoom uint16
+var minzoom uint8
+var maxzoom uint8
 var tilesetName string
 var layerName string
 var description string
@@ -27,6 +27,7 @@ var extent uint16
 var buffer uint16
 var precision uint8
 var simplification uint8
+var simplificationMaxZoom uint8
 
 var createCmd = &cobra.Command{
 	Use:   "create [IN.feather] [OUT.mbtiles]",
@@ -57,6 +58,9 @@ var createCmd = &cobra.Command{
 		if maxzoom < minzoom {
 			return errors.New("maxzoom must be no smaller than minzoom")
 		}
+		if maxzoom > 25 {
+			return errors.New("maxzoom must be no greater than 24")
+		}
 
 		return create(args[0], args[1])
 	},
@@ -64,8 +68,8 @@ var createCmd = &cobra.Command{
 }
 
 func init() {
-	createCmd.Flags().Uint16VarP(&minzoom, "minzoom", "Z", 0, "minimum zoom level")
-	createCmd.Flags().Uint16VarP(&maxzoom, "maxzoom", "z", 0, "maximum zoom level")
+	createCmd.Flags().Uint8VarP(&minzoom, "minzoom", "Z", 0, "minimum zoom level")
+	createCmd.Flags().Uint8VarP(&maxzoom, "maxzoom", "z", 0, "maximum zoom level")
 	createCmd.Flags().StringVarP(&layerName, "layer", "l", "", "layer name")
 	createCmd.Flags().StringVarP(&tilesetName, "name", "n", "", "tileset name")
 	createCmd.Flags().StringVar(&description, "description", "", "tileset description")
@@ -73,11 +77,12 @@ func init() {
 	createCmd.Flags().IntVarP(&numWorkers, "workers", "w", 4, "number of workers to create tiles")
 	createCmd.Flags().Uint16Var(&extent, "extent", 4096, "extent of tile")
 	createCmd.Flags().Uint16Var(&buffer, "buffer", 256, "number of pixels to buffer outside extent before clipping lines / polygons")
-	createCmd.Flags().Uint8VarP(&precision, "precision", "p", 1, "precision used to snap coordinates, in pixels; points are deduplicated to this value")
-	createCmd.Flags().Uint8VarP(&simplification, "simplify", "s", 1, "simplification factor used to simplify lines / polygons, in pixels")
+	createCmd.Flags().Uint8VarP(&precision, "precision", "p", 1, "precision used to snap coordinates, in pixels; points are deduplicated to this resolution")
+	createCmd.Flags().Uint8VarP(&simplification, "simplify", "s", 0, "simplification factor used to simplify lines / polygons, in pixels")
+	createCmd.Flags().Uint8Var(&simplificationMaxZoom, "simplify-max-zoom", 24, "maximum zoom level to apply simplification, if set")
 }
 
-func produce(minZoom uint16, maxZoom uint16, bounds [4]float64, queue chan<- *tiles.TileID) {
+func produce(minZoom uint8, maxZoom uint8, bounds [4]float64, queue chan<- *tiles.TileID) {
 	defer close(queue)
 
 	fmt.Println("Creating tiles")
@@ -146,7 +151,7 @@ func create(infilename string, outfilename string) error {
 
 	db.WriteMetadata(tilesetName, description, minzoom, maxzoom, geoBounds, layersInfo)
 
-	config := tiles.NewEncodingConfig(extent, buffer, precision, simplification)
+	config := tiles.NewEncodingConfig(extent, buffer, precision, simplification, simplificationMaxZoom)
 
 	queue := make(chan *tiles.TileID)
 	var wg sync.WaitGroup

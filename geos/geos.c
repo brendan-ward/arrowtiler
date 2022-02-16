@@ -522,8 +522,8 @@ int geo_to_mercator_coords(double *x, double *y, void *userdata) {
 int mercator_to_tile_coords(double *x, double *y, void *userdata) {
 
   ScaleParams *params = (ScaleParams *)(userdata);
-  *x = (*x) * params->xscale + params->xoffset;
-  *y = (*y) * params->yscale + params->yoffset;
+  *x = trunc((*x) * params->xscale + params->xoffset);
+  *y = trunc((*y) * params->yscale + params->yoffset);
 
   return 1;
 }
@@ -782,19 +782,21 @@ GEOSGeometry **clip_project_to_tile(GEOSGeometry **geometries, size_t count,
     }
     out_geoms[i] = new_geom;
 
-    // Reduce precision using gridSize = precision (default: 1px)
-    // use default flags (preserve topology, drop collapsed geometries)
-    geom = GEOSGeom_setPrecision_r(ctx, out_geoms[i], precision, 0);
-    if (geom == NULL) {
-      printf("ERROR: could not reduce precision for geometry; likely due to "
-             "validity error\n");
-      errstate = GEOSERROR;
-      goto finish;
-    }
+    if (precision > 0) {
+      // Reduce precision using gridSize = precision
+      // use default flags (preserve topology, drop collapsed geometries)
+      geom = GEOSGeom_setPrecision_r(ctx, out_geoms[i], precision, 0);
+      if (geom == NULL) {
+        printf("ERROR: could not reduce precision for geometry; likely due to "
+               "validity error\n");
+        errstate = GEOSERROR;
+        goto finish;
+      }
 
-    // destroy prev geom before overwriting
-    GEOSGeom_destroy_r(ctx, out_geoms[i]);
-    out_geoms[i] = geom;
+      // destroy prev geom before overwriting
+      GEOSGeom_destroy_r(ctx, out_geoms[i]);
+      out_geoms[i] = geom;
+    }
 
     // attempt to collapse multi type to singular
     // WARNING: this may be a big performance hit for polygons

@@ -11,7 +11,7 @@ func closeEnough(a, b, tolerance float64) bool {
 
 func Test_GeoToTile(t *testing.T) {
 	tests := []struct {
-		zoom uint16
+		zoom uint8
 		lon  float64
 		lat  float64
 		x    uint32
@@ -44,7 +44,7 @@ func Test_GeoToTile(t *testing.T) {
 
 func Test_TileRange(t *testing.T) {
 	tests := []struct {
-		zoom    uint16
+		zoom    uint8
 		bounds  [4]float64
 		minTile *TileID
 		maxTile *TileID
@@ -88,7 +88,7 @@ func Test_TileRange(t *testing.T) {
 
 func Test_GeoBounds(t *testing.T) {
 	tests := []struct {
-		zoom uint16
+		zoom uint8
 		x    uint32
 		y    uint32
 		xmin float64
@@ -123,7 +123,7 @@ func Test_GeoBounds(t *testing.T) {
 
 func Test_MercatorBounds(t *testing.T) {
 	tests := []struct {
-		zoom uint16
+		zoom uint8
 		x    uint32
 		y    uint32
 		xmin float64

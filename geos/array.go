@@ -320,12 +320,17 @@ func (g *GeometryArray) ToTile(t *tiles.TileID, config *tiles.EncodingConfig) ([
 		return nil, nil, nil, nil
 	}
 
+	simplification := config.Simplification
+	if simplification > 0 && t.Zoom >= config.SimplificationMaxZoom {
+		simplification = 0
+	}
+
 	inGeoms := make([]GEOSGeometry, size)
 	for i := 0; i < size; i++ {
 		inGeoms[i] = g.geometries[hits[i]]
 	}
 
-	var ptr *GEOSGeometry = (*GEOSGeometry)(C.clip_project_to_tile((**C.GEOSGeometry)(&(inGeoms[0])), C.size_t(size), C.double(xmin), C.double(ymin), C.double(xmax), C.double(ymax), C.uint16_t(config.Extent), C.uint16_t(config.Buffer), C.uchar(config.Precision), C.uchar(config.Simplification)))
+	var ptr *GEOSGeometry = (*GEOSGeometry)(C.clip_project_to_tile((**C.GEOSGeometry)(&(inGeoms[0])), C.size_t(size), C.double(xmin), C.double(ymin), C.double(xmax), C.double(ymax), C.uint16_t(config.Extent), C.uint16_t(config.Buffer), C.uchar(config.Precision), C.uchar(simplification)))
 
 	if ptr == nil {
 		return nil, nil, nil, fmt.Errorf("could not extract GeometryArray in tile %v", t)

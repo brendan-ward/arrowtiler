@@ -17,8 +17,8 @@ import (
 type LayerInfo struct {
 	Name        string            `json:"id"`
 	Description string            `json:"description"`
-	Minzoom     uint16            `json:"minzoom"`
-	Maxzoom     uint16            `json:"maxzoom"`
+	Minzoom     uint8             `json:"minzoom"`
+	Maxzoom     uint8             `json:"maxzoom"`
 	Fields      map[string]string `json:"fields"`
 }
 
@@ -488,7 +488,7 @@ func (t *FeatureTable) EncodeToLayer(name string, tile *tiles.TileID, config *ti
 	return buffer, nil
 }
 
-func (t *FeatureTable) GetLayerInfo(name string, description string, minZoom uint16, maxZoom uint16) (*LayerInfo, error) {
+func (t *FeatureTable) GetLayerInfo(name string, description string, minZoom uint8, maxZoom uint8) (*LayerInfo, error) {
 	fields := make(map[string]string)
 	for _, col := range t.columns {
 		fields[col.Name] = col.Type
