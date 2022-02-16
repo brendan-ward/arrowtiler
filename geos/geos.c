@@ -698,6 +698,21 @@ GEOSGeometry **clip_project_to_tile(GEOSGeometry **geometries, size_t count,
 
   const ScaleParams scale_params = {xscale, xoffset, yscale, yoffset};
 
+  GEOSGeometry *envelope =
+      GEOSGeom_createRectangle_r(ctx, xmin, ymin, xmax, ymax);
+  if (envelope == NULL) {
+    printf("could not create box for tile");
+    errstate = GEOSERROR;
+    goto finish;
+  }
+
+  const GEOSPreparedGeometry *prep_envelope = GEOSPrepare_r(ctx, envelope);
+  if (prep_envelope == NULL) {
+    printf("could not create prepared geometry from box for tile");
+    errstate = GEOSERROR;
+    goto finish;
+  }
+
   for (i = 0; i < count; i++) {
     geom = geometries[i];
     out_geoms[i] = NULL; // default everything to NULL
@@ -740,6 +755,12 @@ GEOSGeometry **clip_project_to_tile(GEOSGeometry **geometries, size_t count,
         printf("ERROR: could not clip geometry to tile bounds plus buffer\n");
         errstate = GEOSERROR;
         goto finish;
+      }
+
+      // verify that at least part of geometry is within tile
+      if (!GEOSPreparedIntersects_r(ctx, prep_envelope, out_geoms[i])) {
+        out_geoms[i] = NULL;
+        continue;
       }
 
       // in case type changed by clip
@@ -877,6 +898,13 @@ finish:
       free(out_geoms);
       out_geoms = NULL;
     }
+  }
+
+  if (envelope != NULL) {
+    GEOSGeom_destroy_r(ctx, envelope);
+  }
+  if (prep_envelope != NULL) {
+    GEOSPreparedGeom_destroy_r(ctx, prep_envelope);
   }
 
   GEOS_FINISH;

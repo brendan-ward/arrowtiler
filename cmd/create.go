@@ -12,9 +12,8 @@ import (
 	"github.com/brendan-ward/arrowtiler/mbtiles"
 	"github.com/brendan-ward/arrowtiler/mvt"
 	"github.com/brendan-ward/arrowtiler/tiles"
-	"github.com/spf13/cobra"
-
 	"github.com/gosuri/uiprogress"
+	"github.com/spf13/cobra"
 )
 
 var minzoom uint16
@@ -57,12 +56,6 @@ var createCmd = &cobra.Command{
 		}
 		if maxzoom < minzoom {
 			return errors.New("maxzoom must be no smaller than minzoom")
-		}
-		if precision < 1 {
-			precision = 1
-		}
-		if simplification < 1 {
-			simplification = 1
 		}
 
 		return create(args[0], args[1])
@@ -108,6 +101,7 @@ func produce(minZoom uint16, maxZoom uint16, bounds [4]float64, queue chan<- *ti
 		}
 	}
 	uiprogress.Stop()
+
 }
 
 func create(infilename string, outfilename string) error {
