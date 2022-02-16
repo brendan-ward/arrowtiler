@@ -747,7 +747,10 @@ GEOSGeometry **clip_project_to_tile(GEOSGeometry **geometries, size_t count,
     // tile, it also doesn't need to be clipped
     if (!(geom_type == GEOS_POINT || (geom_xmin > xmin && geom_xmax < xmax &&
                                       geom_ymin > ymin && geom_ymax < ymax))) {
-      // printf("INFO: Clipping geometry by tile bounds plus buffer\n");
+      // verify that at least part of geometry is within tile
+      if (!GEOSPreparedIntersects_r(ctx, prep_envelope, geom)) {
+        continue;
+      }
 
       out_geoms[i] = GEOSClipByRect_r(ctx, geom, xmin - xbuffer, ymin - ybuffer,
                                       xmax + xbuffer, ymax + ybuffer);
@@ -755,12 +758,6 @@ GEOSGeometry **clip_project_to_tile(GEOSGeometry **geometries, size_t count,
         printf("ERROR: could not clip geometry to tile bounds plus buffer\n");
         errstate = GEOSERROR;
         goto finish;
-      }
-
-      // verify that at least part of geometry is within tile
-      if (!GEOSPreparedIntersects_r(ctx, prep_envelope, out_geoms[i])) {
-        out_geoms[i] = NULL;
-        continue;
       }
 
       // in case type changed by clip
