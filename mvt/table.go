@@ -14,8 +14,6 @@ import (
 	"github.com/brendan-ward/arrowtiler/tiles"
 )
 
-var EXTENT uint16 = 4096 // vector tile default extent
-
 type LayerInfo struct {
 	Name        string            `json:"id"`
 	Description string            `json:"description"`
@@ -368,14 +366,14 @@ func (t *FeatureTable) Take(indexes []int) *FeatureTable {
 	}
 }
 
-func (t *FeatureTable) EncodeToLayer(name string, tile *tiles.TileID) ([]byte, error) {
+func (t *FeatureTable) EncodeToLayer(name string, tile *tiles.TileID, config *tiles.EncodingConfig) ([]byte, error) {
 	// WARNING: assumes that all columns are unique names
 	// and that all values are at least empty for their type
 
 	hasId := t.ids != nil
 
 	// project geometries to tile and encode to MVT format
-	index, geomTypes, encodedGeoms, err := t.geometries.ToTile(tile)
+	index, geomTypes, encodedGeoms, err := t.geometries.ToTile(tile, config)
 
 	if err != nil {
 		return nil, err
@@ -470,7 +468,7 @@ func (t *FeatureTable) EncodeToLayer(name string, tile *tiles.TileID) ([]byte, e
 
 	// layer extent
 	buffer = append(buffer, LAYER_EXTENT_FIELD)
-	buffer = append(buffer, EncodeUvarint(uint64(EXTENT))...)
+	buffer = append(buffer, EncodeUvarint(uint64(config.Extent))...)
 
 	// layer tag keys
 	buffer = append(buffer, keyBuffer...)

@@ -24,6 +24,10 @@ var layerName string
 var description string
 var numWorkers int
 var idColumm string
+var extent uint16
+var buffer uint16
+var precision uint8
+var simplification uint8
 
 var createCmd = &cobra.Command{
 	Use:   "create [IN.feather] [OUT.mbtiles]",
@@ -54,6 +58,12 @@ var createCmd = &cobra.Command{
 		if maxzoom < minzoom {
 			return errors.New("maxzoom must be no smaller than minzoom")
 		}
+		if precision < 1 {
+			precision = 1
+		}
+		if simplification < 1 {
+			simplification = 1
+		}
 
 		return create(args[0], args[1])
 	},
@@ -66,8 +76,12 @@ func init() {
 	createCmd.Flags().StringVarP(&layerName, "layer", "l", "", "layer name")
 	createCmd.Flags().StringVarP(&tilesetName, "name", "n", "", "tileset name")
 	createCmd.Flags().StringVar(&description, "description", "", "tileset description")
-	createCmd.Flags().StringVar(&idColumm, "id", "", "column to use as feature ID (must be integer type)")
+	createCmd.Flags().StringVar(&idColumm, "id", "", "integer column name to use as feature ID")
 	createCmd.Flags().IntVarP(&numWorkers, "workers", "w", 4, "number of workers to create tiles")
+	createCmd.Flags().Uint16Var(&extent, "extent", 4096, "extent of tile")
+	createCmd.Flags().Uint16Var(&buffer, "buffer", 256, "number of pixels to buffer outside extent before clipping lines / polygons")
+	createCmd.Flags().Uint8VarP(&precision, "precision", "p", 1, "precision used to snap coordinates, in pixels; points are deduplicated to this value")
+	createCmd.Flags().Uint8VarP(&simplification, "simplify", "s", 1, "simplification factor used to simplify lines / polygons, in pixels")
 }
 
 func produce(minZoom uint16, maxZoom uint16, bounds [4]float64, queue chan<- *tiles.TileID) {
@@ -138,6 +152,8 @@ func create(infilename string, outfilename string) error {
 
 	db.WriteMetadata(tilesetName, description, minzoom, maxzoom, geoBounds, layersInfo)
 
+	config := tiles.NewEncodingConfig(extent, buffer, precision, simplification)
+
 	queue := make(chan *tiles.TileID)
 	var wg sync.WaitGroup
 
@@ -155,7 +171,7 @@ func create(infilename string, outfilename string) error {
 			defer db.CloseConnection(con)
 
 			for tileID := range queue {
-				tile, err := features.EncodeToLayer(layerName, tileID)
+				tile, err := features.EncodeToLayer(layerName, tileID, config)
 				if err != nil {
 					panic(err)
 				}

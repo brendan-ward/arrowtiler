@@ -97,7 +97,8 @@ GEOSGeometry **project_to_mercator(GEOSGeometry **geometries, size_t count);
 GEOSGeometry **clip_project_to_tile(GEOSGeometry **geometries,
                                     size_t num_geometries, double xmin,
                                     double ymin, double xmax, double ymax,
-                                    uint16_t extent);
+                                    uint16_t extent, uint16_t buffer,
+                                    uint8_t precision, uint8_t simplification);
 
 int encode_geometries(GEOSGeometry **geometries, size_t num_geometries,
                       unsigned char **types, uint32_t ***buffer,

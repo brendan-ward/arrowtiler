@@ -6,6 +6,7 @@
 #include <stdlib.h>
 
 #include "geos.h"
+#include "khash.h"
 #include "kvec.h"
 
 // MVT encoding parameters
@@ -25,6 +26,9 @@ const double LON_FAC = RE * DEG2RAD;
 
 // outermost bounds that can be safely represented in spherical Mercator
 const double WORLD_BOUNDS[4] = {-180.0, -85.051129, 180.0, 85.051129};
+
+// initialize hashmap, named hash32_t
+KHASH_MAP_INIT_INT(hash32_t, char)
 
 // callback from GEOS to Go
 void geos_error_handler(const char *message, void *userdata) {
@@ -643,16 +647,31 @@ finish:
  * geometries: pointer to array of GEOS geometry objects
  * count: size of geometry array
  * xmin...ymax: Web Mercator bounds of tile
+ * extent: size of each edge of the tile, in pixels
+ * buffer: number of pixels beyond edge of tile to use for clipping
+ * simplification: simplification factor for lines and polygons, in pixels
+ *
+ * Returns
+ * -------
+ * pointer to array of GEOS Geometry objects
+ * Returns NULL on error.
  */
 GEOSGeometry **clip_project_to_tile(GEOSGeometry **geometries, size_t count,
                                     double xmin, double ymin, double xmax,
-                                    double ymax, uint16_t extent) {
+                                    double ymax, uint16_t extent,
+                                    uint16_t buffer, uint8_t precision,
+                                    uint8_t simplification) {
 
   double geom_xmin, geom_ymin, geom_xmax, geom_ymax;
   double x, y;
+  uint64_t pixel;
   int i, j, geom_type, new_geom_type, num_coords, num_sub_geoms;
   char is_same_type;
   GEOSGeometry *geom, *new_geom;
+  const GEOSCoordSequence *seq;
+  // only init hashmap if we know there are points
+  khash_t(hash32_t) *pixhash = NULL;
+  int ret;
 
   GEOS_INIT;
 
@@ -660,13 +679,16 @@ GEOSGeometry **clip_project_to_tile(GEOSGeometry **geometries, size_t count,
 
   double xrange = xmax - xmin;
   double yrange = ymax - ymin;
-  double min_width = (xrange / extent) / 2.0;
-  double min_height = (yrange / extent) / 2.0;
 
-  // TODO: this can be dropped to 80px to match GDAL
+  // line and polygon geometries must be at least 2 * precision pixels tall or
+  // wide
+  double min_width = xrange / (extent / (2 * precision));
+  double min_height = yrange / (extent / (2 * precision));
+
   // buffer the tile by 256 units (same as PostGIS default) out of the extent
-  double xbuffer = xrange * (256.0 / (double)extent);
-  double ybuffer = yrange * (256.0 / (double)extent);
+  double buffer_scale = (double)buffer / (double)extent;
+  double xbuffer = xrange * buffer_scale;
+  double ybuffer = yrange * buffer_scale;
 
   // values for scaling coordinates
   double xscale = extent / xrange;
@@ -739,10 +761,9 @@ GEOSGeometry **clip_project_to_tile(GEOSGeometry **geometries, size_t count,
     }
     out_geoms[i] = new_geom;
 
-    // Reduce precision to 1 pixel
-    // use gridSize = 1 (1 pixel)
+    // Reduce precision using gridSize = precision (default: 1px)
     // use default flags (preserve topology, drop collapsed geometries)
-    geom = GEOSGeom_setPrecision_r(ctx, out_geoms[i], 1, 0);
+    geom = GEOSGeom_setPrecision_r(ctx, out_geoms[i], precision, 0);
     if (geom == NULL) {
       printf("ERROR: could not reduce precision for geometry; likely due to "
              "validity error\n");
@@ -754,20 +775,6 @@ GEOSGeometry **clip_project_to_tile(GEOSGeometry **geometries, size_t count,
     GEOSGeom_destroy_r(ctx, out_geoms[i]);
     out_geoms[i] = geom;
 
-    if (!(geom_type == GEOS_POINT || geom_type == GEOS_MULTIPOINT)) {
-      // reduce unnecessary vertices on straight lines
-      // TODO: verify this is giving us correct level of simplification here
-      geom = GEOSSimplify_r(ctx, out_geoms[i], 1);
-      if (geom == NULL) {
-        printf("ERROR: could not simplify geometry\n");
-        return NULL;
-      }
-
-      // destroy prev geom before overwriting
-      GEOSGeom_destroy_r(ctx, out_geoms[i]);
-      out_geoms[i] = geom;
-    }
-
     // attempt to collapse multi type to singular
     // WARNING: this may be a big performance hit for polygons
     // TODO: consider geom_type == GEOS_MULTILINESTRING || geom_type ==
@@ -776,6 +783,48 @@ GEOSGeometry **clip_project_to_tile(GEOSGeometry **geometries, size_t count,
       geom = GEOSUnaryUnion_r(ctx, out_geoms[i]);
       if (geom == NULL) {
         printf("ERROR: could not simplify multi geometry to singular\n");
+        return NULL;
+      }
+
+      // destroy prev geom before overwriting
+      GEOSGeom_destroy_r(ctx, out_geoms[i]);
+      out_geoms[i] = geom;
+      // in case type changed by union
+      geom_type = GEOSGeomTypeId_r(ctx, out_geoms[i]);
+    }
+
+    if (geom_type == GEOS_POINT) {
+      // drop duplicate points
+      seq = GEOSGeom_getCoordSeq_r(ctx, geom);
+      GEOSCoordSeq_getXY_r(ctx, seq, 0, &x, &y);
+      // derive 32 bit pixel ID by bit-shifting together uint16s;
+      // we can do this because pixel values are 0..4096
+      pixel = (khint_t)(((uint16_t)x) << 16 | (uint16_t)y);
+
+      if (pixhash == NULL) {
+        pixhash = kh_init(hash32_t);
+      }
+
+      // if not exists, add it; otherwise, set it to NULL since the
+      // pixel is already occupied
+      if (kh_get(hash32_t, pixhash, pixel) == kh_end(pixhash)) {
+        kh_put(hash32_t, pixhash, pixel, &ret);
+        if (!ret)
+          kh_del(hash32_t, pixhash, pixel);
+      } else {
+        if (out_geoms[i] != NULL) {
+          GEOSGeom_destroy_r(ctx, out_geoms[i]);
+          out_geoms[i] = NULL;
+        }
+        continue;
+      }
+    }
+
+    if (!(geom_type == GEOS_POINT || geom_type == GEOS_MULTIPOINT)) {
+      // reduce unnecessary vertices on straight lines
+      geom = GEOSSimplify_r(ctx, out_geoms[i], simplification);
+      if (geom == NULL) {
+        printf("ERROR: could not simplify geometry\n");
         return NULL;
       }
 
@@ -831,6 +880,10 @@ finish:
   }
 
   GEOS_FINISH;
+
+  if (pixhash != NULL) {
+    kh_destroy(hash32_t, pixhash);
+  }
 
   return out_geoms;
 }

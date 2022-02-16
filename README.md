@@ -46,6 +46,10 @@ At present, geometries are encoded as WKB bytes in a GeoArrow file.
 
 Input geometries must be in geographic coordinates (WGS 1984 / "EPSG:4326").
 
+Geometries must be of a uniform type: all points / multipoints, linestrings /
+multilinestrings, or polygons / multipolygons. GeometryCollections are not
+supported.
+
 ## How it works
 
 This package uses the [GEOS](http://libgeos.org/) C API to provide the

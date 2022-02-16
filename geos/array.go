@@ -294,7 +294,7 @@ func (g *GeometryArray) Take(indexes []int) *GeometryArray {
 // Returns integer of indexes into original array for geometries encoded into the tile,
 // MVT geometry type, and geometries encoded to MVT uint32 commands and coordinates.
 // Input GeometryArray must already be in Mercator coordinates.
-func (g *GeometryArray) ToTile(t *tiles.TileID) ([]int, []byte, [][]uint32, error) {
+func (g *GeometryArray) ToTile(t *tiles.TileID, config *tiles.EncodingConfig) ([]int, []byte, [][]uint32, error) {
 	if g == nil {
 		panic("GeometryArray not initialized")
 	}
@@ -302,8 +302,6 @@ func (g *GeometryArray) ToTile(t *tiles.TileID) ([]int, []byte, [][]uint32, erro
 	if len(g.geometries) == 0 {
 		return nil, nil, nil, nil
 	}
-
-	extent := 4096 // hardcode default for now
 
 	// first figure out if there are any geometries in tile
 	if g.tree == nil {
@@ -327,7 +325,7 @@ func (g *GeometryArray) ToTile(t *tiles.TileID) ([]int, []byte, [][]uint32, erro
 		inGeoms[i] = g.geometries[hits[i]]
 	}
 
-	var ptr *GEOSGeometry = (*GEOSGeometry)(C.clip_project_to_tile((**C.GEOSGeometry)(&(inGeoms[0])), C.size_t(size), C.double(xmin), C.double(ymin), C.double(xmax), C.double(ymax), C.uint16_t(extent)))
+	var ptr *GEOSGeometry = (*GEOSGeometry)(C.clip_project_to_tile((**C.GEOSGeometry)(&(inGeoms[0])), C.size_t(size), C.double(xmin), C.double(ymin), C.double(xmax), C.double(ymax), C.uint16_t(config.Extent), C.uint16_t(config.Buffer), C.uchar(config.Precision), C.uchar(config.Simplification)))
 
 	if ptr == nil {
 		return nil, nil, nil, fmt.Errorf("could not extract GeometryArray in tile %v", t)
