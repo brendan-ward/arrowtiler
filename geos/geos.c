@@ -680,10 +680,11 @@ GEOSGeometry **clip_project_to_tile(GEOSGeometry **geometries, size_t count,
   double xrange = xmax - xmin;
   double yrange = ymax - ymin;
 
-  // line and polygon geometries must be at least 2 * precision pixels tall or
-  // wide
-  double min_width = xrange / (extent / (2 * precision));
-  double min_height = yrange / (extent / (2 * precision));
+  // line and polygon geometries must be at least 2*precision tall or
+  // wide (min 2 pixels)
+  uint8_t width_denom = precision == 0 ? 2 : 2 * precision;
+  double min_width = xrange / (extent / width_denom);
+  double min_height = yrange / (extent / width_denom);
 
   // buffer the tile by 256 units (same as PostGIS default) out of the extent
   double buffer_scale = (double)buffer / (double)extent;
@@ -781,8 +782,8 @@ GEOSGeometry **clip_project_to_tile(GEOSGeometry **geometries, size_t count,
 
     if (precision > 0) {
       // Reduce precision using gridSize = precision
-      // use default flags (preserve topology, drop collapsed geometries)
-      geom = GEOSGeom_setPrecision_r(ctx, out_geoms[i], precision, 0);
+      // set precision without preserving toplogy; it is made valid later
+      geom = GEOSGeom_setPrecision_r(ctx, out_geoms[i], precision, 1);
       if (geom == NULL) {
         printf("ERROR: could not reduce precision for geometry; likely due to "
                "validity error\n");
